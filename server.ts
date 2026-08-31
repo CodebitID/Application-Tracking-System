@@ -9,34 +9,41 @@ import { integrationRouter } from './src/server/routes/integrationRoutes';
 import { webhookRouter } from './src/server/routes/webhookRoutes';
 import { aiRouter } from './src/server/routes/aiRoutes';
 
-async function startServer() {
-  const app = express();
+export const app = express();
 
-  // Parse JSON payloads with generous limit for analysis and description texts
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Parse JSON payloads with generous limit for analysis and description texts.
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  // Initialize Relational Database (PostgreSQL if DATABASE_URL configured, or Embedded SQLite)
+// Mount API routes. Database initialization happens before requests are served.
+app.use(healthRouter);
+app.use(jobRouter);
+app.use(integrationRouter);
+app.use(webhookRouter);
+app.use(aiRouter);
+
+let initialized = false;
+
+export async function initializeServer() {
+  if (initialized) return;
   await db.init();
+  initialized = true;
+}
 
-  // Mount Modular Routes
-  app.use(healthRouter);
-  app.use(jobRouter);
-  app.use(integrationRouter);
-  app.use(webhookRouter);
-  app.use(aiRouter);
+async function startLocalServer() {
+  await initializeServer();
 
-  // Vite middleware in development or static dist files in production
+  // Vite middleware in development or static dist files in local production.
   if (!IS_PRODUCTION) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (process.env.VERCEL !== '1') {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
@@ -46,7 +53,13 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => {
-  console.error('Fatal startup error:', err);
-  process.exit(1);
-});
+// Keep the existing local `npm run dev` / `npm start` workflow intact.
+// On Vercel, /api/index.ts imports this module and Vercel owns the HTTP lifecycle.
+if (process.env.VERCEL !== '1') {
+  startLocalServer().catch((err) => {
+    console.error('Fatal startup error:', err);
+    process.exit(1);
+  });
+}
+
+export default app;
