@@ -1,0 +1,6 @@
+{
+  "name": "Job Tracking Dashboard",
+  "description": "Comprehensive job application tracking dashboard with pipeline Kanban, data table, interview scheduling, analytics, and AI follow-up assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
