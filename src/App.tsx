@@ -20,6 +20,7 @@ import { AuthModal } from './components/AuthModal';
 import { SystemAdminModal } from './components/SystemAdminModal';
 import { UpcomingInterviewBanner } from './components/NotificationCenter';
 import { ActivityFeed } from './components/ActivityFeed';
+import { WebhookApiModal } from './components/WebhookApiModal';
 import {
   JobApplication,
   JobStatus,
@@ -172,6 +173,38 @@ export default function App() {
   const [isSystemAdminOpen, setIsSystemAdminOpen] = useState(false);
   const [isActivityFeedOpen, setIsActivityFeedOpen] = useState(false);
   const [showDashboardFeed, setShowDashboardFeed] = useState(false);
+  const [isWebhookModalOpen, setIsWebhookModalOpen] = useState(false);
+
+  // Sync server-side ingested jobs from REST API / Webhook endpoint
+  useEffect(() => {
+    const fetchWebhookJobs = async () => {
+      try {
+        const res = await fetch('/api/jobs');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.jobs) && data.jobs.length > 0) {
+            setJobs((prevJobs) => {
+              const existingIds = new Set(prevJobs.map((j) => j.id));
+              const existingKeys = new Set(prevJobs.map((j) => j.sourceUniqueKey).filter(Boolean));
+              const newJobsToAdd = data.jobs.filter(
+                (wj: JobApplication) => !existingIds.has(wj.id) && (!wj.sourceUniqueKey || !existingKeys.has(wj.sourceUniqueKey))
+              );
+              if (newJobsToAdd.length > 0) {
+                return [...newJobsToAdd, ...prevJobs];
+              }
+              return prevJobs;
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching webhook jobs from server:', err);
+      }
+    };
+
+    fetchWebhookJobs();
+    const interval = setInterval(fetchWebhookJobs, 12000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Active Account Object
   const currentAccount = useMemo(() => {
@@ -803,6 +836,7 @@ export default function App() {
         onAdminScopeChange={setAdminScope}
         onOpenSystemAdmin={() => setIsSystemAdminOpen(true)}
         onOpenActivityFeed={() => setIsActivityFeedOpen(true)}
+        onOpenWebhookApi={() => setIsWebhookModalOpen(true)}
       />
 
       {/* Upcoming Interview Alert Banner (<24h) */}
@@ -988,6 +1022,19 @@ export default function App() {
         onSelectJob={handleSelectJob}
         isOpen={isActivityFeedOpen}
         onClose={() => setIsActivityFeedOpen(false)}
+      />
+
+      {/* REST API & Webhook Ingestion Hub Modal */}
+      <WebhookApiModal
+        isOpen={isWebhookModalOpen}
+        onClose={() => setIsWebhookModalOpen(false)}
+        onJobImported={(newJob) => {
+          setJobs((prev) => {
+            const exists = prev.some((j) => j.id === newJob.id || (j.sourceUniqueKey && j.sourceUniqueKey === newJob.sourceUniqueKey));
+            if (exists) return prev;
+            return [newJob, ...prev];
+          });
+        }}
       />
     </div>
   );

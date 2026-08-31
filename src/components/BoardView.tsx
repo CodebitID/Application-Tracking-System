@@ -18,6 +18,7 @@ import {
   Bell,
   History,
   MousePointerClick,
+  Globe,
 } from 'lucide-react';
 import { JobApplication, JobStatus } from '../types';
 import {
@@ -256,6 +257,30 @@ export const BoardView: React.FC<BoardViewProps> = ({
                             {job.jobType}
                           </span>
                         </div>
+
+                        {/* REST / Webhook Ingestion Metadata (Fit Score & Remote Eligibility) */}
+                        {job.fitScore !== undefined && (
+                          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                                job.fitScore >= 85
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                  : job.fitScore >= 75
+                                  ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+                                  : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                              }`}
+                            >
+                              <Sparkles className="w-2.5 h-2.5" />
+                              Fit: {job.fitScore}% {job.recommendation ? `• ${job.recommendation}` : ''}
+                            </span>
+                            {job.eligibility && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-white/5 text-slate-300 border border-white/10 truncate max-w-[160px]" title={job.eligibility}>
+                                <Globe className="w-2.5 h-2.5 text-indigo-400 flex-shrink-0" />
+                                <span className="truncate">{job.eligibility}</span>
+                              </span>
+                            )}
+                          </div>
+                        )}
 
                         {/* Interview Date Alert */}
                         {job.interviewDate && (

@@ -218,8 +218,8 @@ export const TableView: React.FC<TableViewProps> = ({
 
                       {/* Job Title & Link */}
                       <td className="py-3 px-3 text-slate-200 font-medium">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate">{job.jobTitle}</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="truncate max-w-[220px]">{job.jobTitle}</span>
                           {job.jobLink && (
                             <a
                               href={job.jobLink}
@@ -231,6 +231,20 @@ export const TableView: React.FC<TableViewProps> = ({
                             >
                               <ExternalLink className="w-3 h-3" />
                             </a>
+                          )}
+                          {job.fitScore !== undefined && (
+                            <span
+                              className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                job.fitScore >= 85
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                  : job.fitScore >= 75
+                                  ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+                                  : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                              }`}
+                            >
+                              <Sparkles className="w-2.5 h-2.5" />
+                              {job.fitScore}% {job.recommendation ? `• ${job.recommendation}` : ''}
+                            </span>
                           )}
                         </div>
                       </td>

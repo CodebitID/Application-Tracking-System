@@ -89,19 +89,42 @@ export interface JobApplication {
   jobTitle: string;
   jobLink?: string;
   jobLinkDomain?: string; // Clean extracted domain, e.g. "linkedin.com", "greenhouse.io"
-  sourcePlatform?: string; // Friendly platform name, e.g. "LinkedIn", "Greenhouse", "Lever"
+  sourcePlatform?: string; // Friendly platform name, e.g. "LinkedIn", "Greenhouse", "We Work Remotely"
   dateApplied?: string; // ISO or YYYY-MM-DD
   deadline?: string;
   jobType: JobType;
-  salary: string; // e.g. "$88,000" or "N/A"
+  salary: string; // e.g. "$88,000" or "$70,000 - $90,000 USD"
   salaryNumeric?: number; // parsed annual number, e.g. 88000
+  salaryMin?: number;
+  salaryMax?: number;
+  currency?: string;
   contactEmailOrLinkedIn?: string;
-  location: string; // e.g. "Remote", "Chicago, IL"
+  location: string; // e.g. "Remote", "Worldwide", "Jakarta, Indonesia"
   isRemote?: boolean;
   status: JobStatus;
   interviewDate?: string;
   notes?: string;
-  tag?: string; // e.g. "Follow up", "Priority"
+  tag?: string; // e.g. "Follow up", "Priority", "HIGH PRIORITY"
+  
+  // REST API & Webhook Ingestion Metadata
+  externalJobId?: string; // Unique external ID from job source
+  sourceUniqueKey?: string; // Unique hash/key to prevent duplicate ingestion
+  fitScore?: number; // 0 - 100 overall compatibility rating
+  recommendation?: 'HIGH PRIORITY' | 'APPLY' | 'SELECTIVELY' | 'DO NOT APPLY' | string;
+  technicalFit?: number; // 0 - 100
+  experienceFit?: number; // 0 - 100
+  locationFit?: number; // 0 - 100
+  eligibility?: string; // e.g. "Remote from Indonesia", "Worldwide Allowed"
+  mainRisk?: string; // e.g. "Requires 4-hour US timezone overlap"
+  matchedSkills?: string[]; // e.g. ["WordPress", "PHP", "REST API", "WooCommerce"]
+  missingSkills?: string[]; // e.g. ["GraphQL"]
+  workAuthorization?: string;
+  timezoneRequirement?: string;
+  companyUrl?: string;
+  jobDescription?: string;
+  firstSeenAt?: string;
+  postedAt?: string;
+
   statusHistory?: StatusHistoryEntry[];
   reminders?: ApplicationReminder[];
   contacts?: ApplicationContact[];
@@ -109,6 +132,21 @@ export interface JobApplication {
   coverLetters?: CoverLetterRecord[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface WebhookLog {
+  id: string;
+  timestamp: string;
+  method: string;
+  endpoint: string;
+  source?: string;
+  companyName?: string;
+  jobTitle?: string;
+  status: 'success' | 'duplicate_skipped' | 'unauthorized' | 'validation_error';
+  statusCode: number;
+  message: string;
+  jobId?: string;
+  payloadSummary?: string;
 }
 
 export type ViewMode = 'board' | 'table' | 'analytics' | 'calendar';

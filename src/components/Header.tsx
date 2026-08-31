@@ -24,6 +24,7 @@ import {
   Globe,
   Sliders,
   Activity,
+  Webhook,
 } from 'lucide-react';
 import { JobApplication, ViewMode, UserAccount } from '../types';
 import { NotificationCenter } from './NotificationCenter';
@@ -48,6 +49,7 @@ interface HeaderProps {
   onAdminScopeChange?: (scope: string) => void;
   onOpenSystemAdmin?: () => void;
   onOpenActivityFeed?: () => void;
+  onOpenWebhookApi?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -70,6 +72,7 @@ export const Header: React.FC<HeaderProps> = ({
   onAdminScopeChange,
   onOpenSystemAdmin,
   onOpenActivityFeed,
+  onOpenWebhookApi,
 }) => {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
@@ -242,10 +245,24 @@ export const Header: React.FC<HeaderProps> = ({
               id="header-activity-feed-btn"
               onClick={onOpenActivityFeed}
               title="Open Recent Activity Feed"
-              className="px-2.5 py-1.5 rounded-xl bg-[#141418] hover:bg-[#1A1A20] border border-white/10 text-slate-300 hover:text-white transition-all group flex items-center gap-1.5 text-xs font-medium"
+              className="px-2.5 py-1.5 rounded-xl bg-[#141418] hover:bg-[#1A1A20] border border-white/10 text-slate-300 hover:text-white transition-all group flex items-center gap-1.5 text-xs font-medium cursor-pointer"
             >
               <Activity className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" />
               <span className="hidden xl:inline">Activity</span>
+            </button>
+          )}
+
+          {/* Webhook & REST API Hub Button */}
+          {onOpenWebhookApi && (
+            <button
+              id="header-webhook-api-btn"
+              onClick={onOpenWebhookApi}
+              title="Open REST API & Webhook Ingestion Hub (POST /api/jobs)"
+              className="px-2.5 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 hover:text-white transition-all group flex items-center gap-1.5 text-xs font-semibold cursor-pointer shadow-xs"
+            >
+              <Webhook className="w-4 h-4 text-indigo-400 group-hover:rotate-45 transition-transform" />
+              <span className="hidden lg:inline">REST API</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             </button>
           )}
 
