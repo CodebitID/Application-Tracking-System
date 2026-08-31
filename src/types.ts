@@ -2,15 +2,16 @@ export type JobType = 'Full-Time' | 'Part-Time' | 'Contract' | 'Freelance' | 'In
 
 export type JobStatus = 
   | 'Not Started'
+  | 'Preparing'
   | 'Applied'
   | 'Screening'
   | 'Interviewing'
-  | 'Offer Extended'
+  | 'Offer Received'
   | 'Rejected'
   | 'Withdrawn'
+  | 'Offer Extended'
   | 'Interview Scheduled'
   | 'Interviewed'
-  | 'Offer Received'
   | 'No Reply';
 
 export interface StatusHistoryEntry {
@@ -62,98 +63,197 @@ export interface CoverLetterRecord {
   createdAt: string;
 }
 
-export type UserRole = 'candidate' | 'superadmin';
-
-export interface UserAccount {
-  id: string;
+export interface UserProfile {
   name: string;
   email: string;
-  role?: UserRole; // 'candidate' | 'superadmin' (defaults to 'candidate')
-  password?: string; // For authentication system
-  avatarColor: string; // Gradient class e.g. "from-indigo-500 to-purple-600"
   targetRole: string;
   targetLocation?: string;
   phone?: string;
   resumeHighlights?: string; // Background highlights used for AI Cover Letter generation
-  createdAt: string;
-  isDefault?: boolean;
-  bio?: string;
-  lastLoginAt?: string;
 }
 
+export type UserAccount = UserProfile;
+
+/**
+ * Job Analysis Data Model v2 - Nested Analysis Structure
+ */
+export interface JobAnalysisV2 {
+  // Fit Assessment (0 - 100)
+  overallFitScore?: number;
+  fitScore?: number;
+  technicalFit?: number;
+  experienceFit?: number;
+  industryFit?: number;
+  seniorityFit?: number;
+  locationEligibilityFit?: number;
+  compensationFit?: number;
+  locationFit?: number;
+  suitabilityClassification?: string; // "STRONG FIT" | "GOOD FIT" | "SELECTIVE FIT" | "LOW FIT"
+  eligibility?: string;
+
+  // What They Actually Need
+  criticalRequirements?: string[];
+  preferredRequirements?: string[];
+  roleResponsibilities?: string[];
+
+  // Candidate Match Breakdown
+  strongMatches?: string[];
+  partialMatches?: string[];
+  gaps?: string[];
+  unknowns?: string[];
+
+  // Important Notes, Blockers & Risks
+  importantNotes?: string[];
+  hardBlockers?: string[];
+  applicationRisks?: string[];
+
+  // Restrictions & Requirements
+  workAuthorization?: string;
+  countryRestrictions?: string;
+  timezoneRequirement?: string;
+  relocationExpectation?: string;
+  languageRequirement?: string;
+  degreeRequirement?: string;
+  certificationRequirement?: string;
+
+  // Strategy & Recommendation
+  recommendation?: string; // "HIGH PRIORITY — APPLY" | "STRONG APPLY" | "APPLY" | "APPLY SELECTIVELY" | "LOW PRIORITY" | "SKIP" | "DO NOT APPLY"
+  bestPositioning?: string;
+  bestEvidence?: string[];
+  mainRisk?: string;
+  analysisSummary?: string;
+  analyzedAt?: string;
+}
+
+/**
+ * Job Analysis Data Model v2
+ */
 export interface JobApplication {
   id: string;
-  accountId?: string; // Owner account ID
-  accountName?: string; // Owner account display name (for Superadmin aggregated view)
   companyName: string;
   jobTitle: string;
+  normalizedCompany?: string;
+  normalizedTitle?: string;
   jobLink?: string;
-  jobLinkDomain?: string; // Clean extracted domain, e.g. "linkedin.com", "greenhouse.io"
-  sourcePlatform?: string; // Friendly platform name, e.g. "LinkedIn", "Greenhouse", "We Work Remotely"
-  dateApplied?: string; // ISO or YYYY-MM-DD
-  deadline?: string;
+  normalizedSourceUrl?: string;
+  jobLinkDomain?: string; // Clean extracted domain, e.g. "weworkremotely.com"
+  sourcePlatform?: string; // e.g. "We Work Remotely", "RemoteOK", "LinkedIn"
+  sourceUrl?: string;
+  sourceUniqueKey?: string;
+  externalJobId?: string;
+  companyUrl?: string;
+  location: string;
+  isRemote: boolean;
   jobType: JobType;
-  salary: string; // e.g. "$88,000" or "$70,000 - $90,000 USD"
-  salaryNumeric?: number; // parsed annual number, e.g. 88000
+  salary: string;
+  salaryNumeric?: number;
   salaryMin?: number;
   salaryMax?: number;
   currency?: string;
-  contactEmailOrLinkedIn?: string;
-  location: string; // e.g. "Remote", "Worldwide", "Jakarta, Indonesia"
-  isRemote?: boolean;
   status: JobStatus;
-  interviewDate?: string;
-  notes?: string;
-  tag?: string; // e.g. "Follow up", "Priority", "HIGH PRIORITY"
-  
-  // REST API & Webhook Ingestion Metadata
-  externalJobId?: string; // Unique external ID from job source
-  sourceUniqueKey?: string; // Unique hash/key to prevent duplicate ingestion
-  fitScore?: number; // 0 - 100 overall compatibility rating
-  recommendation?: 'HIGH PRIORITY' | 'APPLY' | 'SELECTIVELY' | 'DO NOT APPLY' | string;
-  technicalFit?: number; // 0 - 100
-  experienceFit?: number; // 0 - 100
-  locationFit?: number; // 0 - 100
-  eligibility?: string; // e.g. "Remote from Indonesia", "Worldwide Allowed"
-  mainRisk?: string; // e.g. "Requires 4-hour US timezone overlap"
-  matchedSkills?: string[]; // e.g. ["WordPress", "PHP", "REST API", "WooCommerce"]
-  missingSkills?: string[]; // e.g. ["GraphQL"]
-  workAuthorization?: string;
-  timezoneRequirement?: string;
-  companyUrl?: string;
-  jobDescription?: string;
-  firstSeenAt?: string;
-  postedAt?: string;
+  notes?: string; // Strictly for user-authored notes
+  tag?: string;
 
-  statusHistory?: StatusHistoryEntry[];
-  reminders?: ApplicationReminder[];
+  // Snapshot details
+  seniority?: string;
+  industry?: string;
+
+  // Nested Analysis Object (v2)
+  analysis?: JobAnalysisV2;
+
+  // Top-level conveniences / What They Actually Need
+  criticalRequirements?: string[];
+  preferredRequirements?: string[];
+  roleResponsibilities?: string[];
+
+  // My Match
+  strongMatches?: string[];
+  partialMatches?: string[];
+  gaps?: string[];
+  unknowns?: string[];
+
+  // Important Notes & Restrictions
+  importantNotes?: string[];
+  hardBlockers?: string[];
+  applicationRisks?: string[];
+  workAuthorization?: string;
+  countryRestrictions?: string;
+  timezoneRequirement?: string;
+  relocationExpectation?: string;
+  languageRequirement?: string;
+  degreeRequirement?: string;
+  certificationRequirement?: string;
+
+  // Fit Assessment (0 - 100)
+  overallFitScore?: number;
+  fitScore?: number; // legacy alias for overallFitScore
+  technicalFit?: number;
+  experienceFit?: number;
+  industryFit?: number;
+  seniorityFit?: number;
+  locationEligibilityFit?: number;
+  compensationFit?: number;
+  locationFit?: number; // legacy alias for locationEligibilityFit
+  suitabilityClassification?: string; // e.g. "STRONG FIT", "GOOD FIT", "SELECTIVE FIT", "LOW FIT"
+  eligibility?: string;
+
+  // Decision & Strategy
+  recommendation?: string; // "HIGH PRIORITY — APPLY" | "HIGH PRIORITY" | "APPLY" | "APPLY SELECTIVELY" | "LOW PRIORITY" | "SKIP" | "DO NOT APPLY"
+  bestPositioning?: string;
+  bestEvidence?: string[];
+  mainRisk?: string;
+  analysisSummary?: string;
+  jobDescription?: string;
+
+  // Ingestion Source Metadata
+  ingestionSource?: string; // e.g. "scheduled-job-monitor", "manual", "webhook", "chatgpt-bridge"
+  analysisVersion?: string; // "v2"
+  automaticallyDiscovered?: boolean;
+  firstSeenAt?: string;
+  lastSeenAt?: string;
+  postedAt?: string;
+  dateApplied?: string;
+  deadline?: string;
+  interviewDate?: string;
+  contactEmailOrLinkedIn?: string;
+
+  // Application Management sub-items
   contacts?: ApplicationContact[];
-  prepChecklist?: PrepChecklistItem[];
-  coverLetters?: CoverLetterRecord[];
+  reminders?: ApplicationReminder[];
+  statusHistory?: StatusHistoryEntry[];
+  interviewChecklist?: PrepChecklistItem[];
+  savedCoverLetters?: CoverLetterRecord[];
+
   createdAt: string;
   updatedAt: string;
 }
 
 export interface WebhookLog {
   id: string;
-  timestamp: string;
+  created_at?: string;
+  timestamp?: string;
   method: string;
   endpoint: string;
   source?: string;
   companyName?: string;
+  company_name?: string;
   jobTitle?: string;
-  status: 'success' | 'duplicate_skipped' | 'unauthorized' | 'validation_error';
-  statusCode: number;
+  job_title?: string;
+  status: string;
+  statusCode?: number;
+  status_code?: number;
   message: string;
   jobId?: string;
+  job_id?: string;
   payloadSummary?: string;
+  payload_summary?: string;
 }
 
 export type ViewMode = 'board' | 'table' | 'analytics' | 'calendar';
 
 export interface FilterState {
-  search: string; // keyword search across company, title, notes, etc.
-  locationSearch: string; // specific city, state, or location query
+  search: string;
+  locationSearch: string;
   statuses: JobStatus[];
   jobTypes: JobType[];
   locationFilter: 'all' | 'remote' | 'onsite';

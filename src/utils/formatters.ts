@@ -12,6 +12,14 @@ export const STATUS_CONFIG: Record<
     dot: 'bg-slate-500',
     lightBg: 'bg-white/[0.02]',
   },
+  'Preparing': {
+    label: 'Preparing',
+    bg: 'bg-blue-500/10',
+    text: 'text-blue-400',
+    border: 'border-blue-500/30',
+    dot: 'bg-blue-500',
+    lightBg: 'bg-blue-500/5',
+  },
   'Applied': {
     label: 'Applied',
     bg: 'bg-indigo-500/10',

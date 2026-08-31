@@ -225,14 +225,6 @@ export const BoardView: React.FC<BoardViewProps> = ({
                           </div>
                         </div>
 
-                        {/* If in Multi-user Superadmin view: show owner badge */}
-                        {job.accountName && (
-                          <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-950/40 text-indigo-300 border border-indigo-500/20 text-[10px] font-medium">
-                            <User className="w-2.5 h-2.5" />
-                            <span>Candidate: {job.accountName}</span>
-                          </div>
-                        )}
-
                         {/* Badges: Salary, Location, Job Type */}
                         <div className="flex flex-wrap items-center gap-1.5 mt-2.5 text-[11px]">
                           {job.salary && job.salary !== 'N/A' && (

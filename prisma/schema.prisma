@@ -1,0 +1,125 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model JobApplication {
+  id                        String   @id
+  companyName               String   @map("company_name")
+  jobTitle                  String   @map("job_title")
+  normalizedCompany         String   @map("normalized_company")
+  normalizedTitle           String   @map("normalized_title")
+  jobLink                   String?  @map("job_link")
+  normalizedSourceUrl       String?  @map("normalized_source_url")
+  jobLinkDomain             String?  @map("job_link_domain")
+  sourcePlatform            String   @map("source_platform")
+  externalJobId             String?  @map("external_job_id")
+  companyUrl                String?  @map("company_url")
+  location                  String
+  isRemote                  Boolean  @default(true) @map("is_remote")
+  jobType                   String   @default("Full-Time") @map("job_type")
+  salary                    String?
+  salaryNumeric             Float?   @map("salary_numeric")
+  salaryMin                 Float?   @map("salary_min")
+  salaryMax                 Float?   @map("salary_max")
+  currency                  String?  @default("USD")
+  status                    String   @default("Not Started")
+  notes                     String?
+  tag                       String?
+  dateApplied               String?  @map("date_applied")
+  deadline                  String?
+  postedAt                  String?  @map("posted_at")
+  interviewDate             String?  @map("interview_date")
+  contactEmailOrLinkedIn    String?  @map("contact_email_or_linkedin")
+  firstSeenAt               String   @map("first_seen_at")
+  lastSeenAt                String   @map("last_seen_at")
+
+  // Fit & Assessment (Analysis Data Model v2)
+  overallFitScore           Float?   @map("overall_fit_score")
+  fitScore                  Float?   @map("fit_score")
+  suitabilityClassification String?  @map("suitability_classification")
+  recommendation            String?
+  technicalFit              Float?   @map("technical_fit")
+  experienceFit             Float?   @map("experience_fit")
+  industryFit               Float?   @map("industry_fit")
+  seniorityFit              Float?   @map("seniority_fit")
+  locationEligibilityFit    Float?   @map("location_eligibility_fit")
+  compensationFit           Float?   @map("compensation_fit")
+  locationFit               Float?   @map("location_fit")
+  eligibility               String?
+
+  // Structured Lists & Nested Objects
+  criticalRequirements      String?  @map("critical_requirements")
+  preferredRequirements     String?  @map("preferred_requirements")
+  roleResponsibilities      String?  @map("role_responsibilities")
+  strongMatches             String?  @map("strong_matches")
+  partialMatches            String?  @map("partial_matches")
+  gaps                      String?
+  unknowns                  String?
+  importantNotes            String?  @map("important_notes")
+  hardBlockers              String?  @map("hard_blockers")
+  applicationRisks          String?  @map("application_risks")
+  analysisJson              String?  @map("analysis_json")
+
+  // Requirements & Restrictions
+  workAuthorization         String?  @map("work_authorization")
+  countryRestrictions       String?  @map("country_restrictions")
+  timezoneRequirement       String?  @map("timezone_requirement")
+  relocationExpectation     String?  @map("relocation_expectation")
+  languageRequirement       String?  @map("language_requirement")
+  degreeRequirement         String?  @map("degree_requirement")
+  certificationRequirement  String?  @map("certification_requirement")
+
+  // Strategic Positioning & Summary
+  bestPositioning           String?  @map("best_positioning")
+  bestEvidence              String?  @map("best_evidence")
+  mainRisk                  String?  @map("main_risk")
+  analysisSummary           String?  @map("analysis_summary")
+  jobDescription            String?  @map("job_description")
+
+  // Ingestion & Automation Metadata
+  ingestionSource           String?  @default("api") @map("ingestion_source")
+  analysisVersion           String?  @default("v2") @map("analysis_version")
+  automaticallyDiscovered   Boolean  @default(false) @map("automatically_discovered")
+  sourceUniqueKey           String?  @map("source_unique_key")
+
+  // Sub-items (JSON strings)
+  contactsJson              String?  @map("contacts_json")
+  remindersJson             String?  @map("reminders_json")
+  statusHistoryJson         String?  @map("status_history_json")
+  prepChecklistJson         String?  @map("prep_checklist_json")
+  coverLettersJson          String?  @map("cover_letters_json")
+
+  createdAt                 String   @map("created_at")
+  updatedAt                 String   @map("updated_at")
+
+  @@index([sourcePlatform, externalJobId])
+  @@index([normalizedSourceUrl])
+  @@index([normalizedCompany, normalizedTitle])
+  @@index([status])
+  @@index([overallFitScore])
+  @@index([createdAt])
+  @@map("job_applications")
+}
+
+model WebhookLog {
+  id             String   @id
+  method         String
+  endpoint       String
+  source         String?
+  companyName    String?  @map("company_name")
+  jobTitle       String?  @map("job_title")
+  status         String
+  statusCode     Int      @map("status_code")
+  message        String
+  jobId          String?  @map("job_id")
+  payloadSummary String?  @map("payload_summary")
+  createdAt      String   @map("created_at")
+
+  @@index([createdAt])
+  @@map("webhook_logs")
+}

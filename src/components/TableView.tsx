@@ -3,19 +3,19 @@ import {
   ExternalLink,
   Copy,
   Check,
-  Calendar,
-  MoreVertical,
-  ChevronDown,
   Sparkles,
-  Edit2,
   Trash2,
   Download,
-  Filter,
-  ArrowUpDown,
-  Mail,
-  User,
   MapPin,
   DollarSign,
+  Globe,
+  AlertTriangle,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Layers,
+  ArrowUpRight,
+  ShieldCheck,
 } from 'lucide-react';
 import { JobApplication, JobStatus } from '../types';
 import {
@@ -29,7 +29,7 @@ import {
 interface TableViewProps {
   jobs: JobApplication[];
   onSelectJob: (job: JobApplication) => void;
-  onEditJob: (job: JobApplication) => void;
+  onEditJob?: (job: JobApplication) => void;
   onUpdateJobStatus: (id: string, newStatus: JobStatus) => void;
   onDeleteJob: (id: string) => void;
   onDeleteMultipleJobs: (ids: string[]) => void;
@@ -40,7 +40,6 @@ interface TableViewProps {
 export const TableView: React.FC<TableViewProps> = ({
   jobs,
   onSelectJob,
-  onEditJob,
   onUpdateJobStatus,
   onDeleteJob,
   onDeleteMultipleJobs,
@@ -73,7 +72,7 @@ export const TableView: React.FC<TableViewProps> = ({
   };
 
   const handleBulkDelete = () => {
-    if (confirm(`Delete ${selectedIds.length} selected job applications?`)) {
+    if (confirm(`Delete ${selectedIds.length} selected job opportunities?`)) {
       onDeleteMultipleJobs(selectedIds);
       setSelectedIds([]);
     }
@@ -83,22 +82,44 @@ export const TableView: React.FC<TableViewProps> = ({
     selectedIds.forEach((id) => onUpdateJobStatus(id, status));
   };
 
+  const getScoreBadgeClass = (score?: number) => {
+    if (score === undefined || score === null) return 'bg-slate-800/60 text-slate-400 border-slate-700/50';
+    if (score >= 85) return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+    if (score >= 70) return 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30';
+    if (score >= 50) return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+    return 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+  };
+
+  const getRecBadgeClass = (rec?: string) => {
+    if (!rec) return 'bg-white/5 text-slate-300 border-white/10';
+    const lower = rec.toLowerCase();
+    if (lower.includes('high') || lower.includes('priority')) {
+      return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-semibold';
+    }
+    if (lower.includes('apply') && !lower.includes('select')) {
+      return 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40 font-medium';
+    }
+    if (lower.includes('select')) {
+      return 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-medium';
+    }
+    return 'bg-slate-800 text-slate-400 border-slate-700';
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 space-y-3">
       {/* Bulk Action Toolbar */}
       {selectedIds.length > 0 && (
-        <div className="flex items-center justify-between p-3 bg-indigo-950/40 border border-indigo-500/30 rounded-xl shadow-xs animate-fadeIn">
+        <div className="flex items-center justify-between p-3 bg-indigo-950/60 border border-indigo-500/40 rounded-xl shadow-lg animate-fadeIn backdrop-blur-sm">
           <div className="flex items-center gap-2 text-xs font-semibold text-indigo-200">
-            <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-md">
+            <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-md font-mono">
               {selectedIds.length}
             </span>
-            <span>selected</span>
+            <span>opportunities selected</span>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Bulk status update */}
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">Set status:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-300">Set status:</span>
               <select
                 onChange={(e) => {
                   if (e.target.value) {
@@ -107,7 +128,7 @@ export const TableView: React.FC<TableViewProps> = ({
                   }
                 }}
                 defaultValue=""
-                className="text-xs bg-[#16161A] border border-white/10 rounded-lg px-2 py-1 font-medium text-slate-200 cursor-pointer"
+                className="text-xs bg-[#16161A] border border-white/10 rounded-lg px-2.5 py-1.5 font-medium text-slate-200 cursor-pointer"
               >
                 <option value="" disabled className="bg-[#16161A]">
                   Choose status...
@@ -120,297 +141,254 @@ export const TableView: React.FC<TableViewProps> = ({
               </select>
             </div>
 
-            {/* Export selected */}
             <button
               onClick={() => {
                 const selectedJobs = jobs.filter((j) => selectedIds.includes(j.id));
                 onExportSelected(selectedJobs);
               }}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-white/5 border border-white/10 rounded-lg text-slate-200 hover:bg-white/10"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-slate-200 transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Export Selected</span>
+              Export
             </button>
 
-            {/* Bulk delete */}
             <button
               onClick={handleBulkDelete}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-rose-600 text-white rounded-lg hover:bg-rose-500 shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 text-xs font-medium text-rose-300 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span>Delete</span>
+              Delete ({selectedIds.length})
             </button>
           </div>
         </div>
       )}
 
-      {/* Main Spreadsheet Table Container */}
-      <div className="bg-[#16161A] border border-white/5 rounded-2xl shadow-xs overflow-hidden">
+      {/* Main Opportunity Decision Table */}
+      <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#121216] shadow-xl">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-[#0D0D10] border-b border-white/5 text-slate-500 font-bold uppercase text-[10px] tracking-widest">
-                <th className="py-3 px-3.5 w-10 text-center">
+              <tr className="border-b border-white/10 bg-[#17171E] text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
+                <th className="w-10 px-4 py-3.5 text-center">
                   <input
                     type="checkbox"
-                    checked={selectedIds.length === jobs.length && jobs.length > 0}
+                    checked={jobs.length > 0 && selectedIds.length === jobs.length}
                     onChange={toggleSelectAll}
-                    className="rounded border-white/10 bg-white/5 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    className="w-4 h-4 rounded border-slate-700 bg-black/40 text-indigo-600 focus:ring-0 cursor-pointer"
                   />
                 </th>
-                <th className="py-3 px-3 min-w-[180px]">Company</th>
-                <th className="py-3 px-3 min-w-[180px]">Job Title</th>
-                <th className="py-3 px-3 min-w-[150px]">Status</th>
-                <th className="py-3 px-3 min-w-[110px]">Applied</th>
-                <th className="py-3 px-3 min-w-[110px]">Deadline</th>
-                <th className="py-3 px-3 min-w-[100px]">Type</th>
-                <th className="py-3 px-3 min-w-[100px]">Salary</th>
-                <th className="py-3 px-3 min-w-[140px]">Location</th>
-                <th className="py-3 px-3 min-w-[150px]">Contact</th>
-                <th className="py-3 px-3 min-w-[110px]">Interview</th>
-                <th className="py-3 px-3 min-w-[120px]">Tag / Notes</th>
-                <th className="py-3 px-3 text-right min-w-[90px]">Actions</th>
+                <th className="px-4 py-3.5 min-w-[140px]">Fit & Decision</th>
+                <th className="px-4 py-3.5 min-w-[220px]">Role & Company</th>
+                <th className="px-4 py-3.5 min-w-[160px]">Location & Work Mode</th>
+                <th className="px-4 py-3.5 min-w-[150px]">Compensation</th>
+                <th className="px-4 py-3.5 min-w-[200px]">Top Skills & Analysis</th>
+                <th className="px-4 py-3.5 min-w-[140px]">Source & Ingest</th>
+                <th className="px-4 py-3.5 min-w-[150px] text-right">Status & Review</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+
+            <tbody className="divide-y divide-white/5 text-xs text-slate-300">
               {jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="py-12 text-center text-slate-500">
-                    No job applications match your filters.
+                  <td colSpan={8} className="px-6 py-16 text-center text-slate-400 space-y-3">
+                    <Layers className="w-10 h-10 mx-auto text-slate-600 opacity-60" />
+                    <p className="text-sm font-medium text-slate-300">No job opportunities match current filters</p>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto">
+                      Use the Webhook / REST API to ingest opportunities from your automated job monitors, or adjust your active search and status filters.
+                    </p>
                   </td>
                 </tr>
               ) : (
                 jobs.map((job) => {
                   const isSelected = selectedIds.includes(job.id);
-                  const statusConfig = STATUS_CONFIG[job.status];
+                  const statusConf = STATUS_CONFIG[job.status] || STATUS_CONFIG['Not Started'];
+                  const fitScore = job.overallFitScore ?? job.fitScore;
+                  const skills = job.strongMatches || job.criticalRequirements || [];
 
                   return (
                     <tr
                       key={job.id}
                       onClick={() => onSelectJob(job)}
-                      className={`hover:bg-white/[0.02] cursor-pointer transition-colors group ${
+                      className={`group cursor-pointer transition-colors duration-150 hover:bg-white/[0.03] ${
                         isSelected ? 'bg-indigo-950/20' : ''
                       }`}
                     >
-                      {/* Select checkbox */}
-                      <td className="py-3 px-3.5 text-center" onClick={(e) => toggleSelectRow(job.id, e)}>
+                      {/* Checkbox */}
+                      <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => {}}
-                          className="rounded border-white/10 bg-white/5 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          onChange={(e) => toggleSelectRow(job.id, e as any)}
+                          className="w-4 h-4 rounded border-slate-700 bg-black/40 text-indigo-600 focus:ring-0 cursor-pointer"
                         />
                       </td>
 
-                      {/* Company Name */}
-                      <td className="py-3 px-3 font-semibold text-white">
+                      {/* 1. Fit & Recommendation */}
+                      <td className="px-4 py-3.5 space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <div
-                            className={`w-6 h-6 rounded-md bg-gradient-to-br ${getCompanyColor(
-                              job.companyName
-                            )} text-white font-bold text-[10px] flex items-center justify-center flex-shrink-0`}
-                          >
-                            {job.companyName.charAt(0).toUpperCase()}
-                          </div>
-                          <span className="truncate">{job.companyName}</span>
+                          {fitScore !== undefined && fitScore !== null ? (
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold font-mono border ${getScoreBadgeClass(
+                                fitScore
+                              )}`}
+                            >
+                              {fitScore}%
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-500 font-mono">—</span>
+                          )}
+
+                          {job.recommendation && (
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wider border ${getRecBadgeClass(
+                                job.recommendation
+                              )}`}
+                            >
+                              {job.recommendation}
+                            </span>
+                          )}
                         </div>
+
+                        {job.suitabilityClassification && (
+                          <div className="text-[10px] text-slate-400 font-medium">
+                            {job.suitabilityClassification}
+                          </div>
+                        )}
                       </td>
 
-                      {/* Job Title & Link */}
-                      <td className="py-3 px-3 text-slate-200 font-medium">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="truncate max-w-[220px]">{job.jobTitle}</span>
+                      {/* 2. Role & Company */}
+                      <td className="px-4 py-3.5 space-y-1">
+                        <div className="font-semibold text-slate-100 group-hover:text-indigo-300 transition-colors flex items-center gap-1.5 text-sm">
+                          <span>{job.jobTitle}</span>
                           {job.jobLink && (
                             <a
                               href={job.jobLink}
                               target="_blank"
                               rel="noreferrer"
                               onClick={(e) => e.stopPropagation()}
+                              className="text-slate-400 hover:text-white transition-colors"
                               title="Open original job posting"
-                              className="text-slate-500 hover:text-indigo-400 transition-colors flex-shrink-0"
                             >
-                              <ExternalLink className="w-3 h-3" />
+                              <ArrowUpRight className="w-3.5 h-3.5" />
                             </a>
                           )}
-                          {job.fitScore !== undefined && (
-                            <span
-                              className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold border ${
-                                job.fitScore >= 85
-                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                                  : job.fitScore >= 75
-                                  ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
-                                  : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                              }`}
-                            >
-                              <Sparkles className="w-2.5 h-2.5" />
-                              {job.fitScore}% {job.recommendation ? `• ${job.recommendation}` : ''}
+                        </div>
+
+                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                          <span className="font-medium text-slate-300">{job.companyName}</span>
+                          {job.jobLinkDomain && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/5 text-slate-400">
+                              {job.jobLinkDomain}
                             </span>
                           )}
                         </div>
                       </td>
 
-                      {/* Interactive Status Dropdown */}
-                      <td className="py-3 px-3" onClick={(e) => e.stopPropagation()}>
-                        <div className="relative inline-block">
+                      {/* 3. Location & Work Mode */}
+                      <td className="px-4 py-3.5 space-y-1">
+                        <div className="flex items-center gap-1.5 text-slate-200">
+                          {job.isRemote ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                              <Globe className="w-3 h-3" />
+                              Remote
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-300 border border-white/5">
+                              <MapPin className="w-3 h-3" />
+                              On-site
+                            </span>
+                          )}
+                          <span className="truncate max-w-[110px] text-xs text-slate-300" title={job.location}>
+                            {job.location}
+                          </span>
+                        </div>
+
+                        {job.eligibility && (
+                          <div className="text-[10px] text-indigo-300/80 font-medium truncate max-w-[150px]" title={job.eligibility}>
+                            {job.eligibility}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* 4. Compensation */}
+                      <td className="px-4 py-3.5 space-y-1">
+                        <div className="font-medium text-slate-200 text-xs">
+                          {job.salary || 'Competitive / Market Rate'}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-medium">
+                          {job.jobType || 'Full-Time'}
+                        </div>
+                      </td>
+
+                      {/* 5. Top Skills & Highlights */}
+                      <td className="px-4 py-3.5 space-y-1.5">
+                        <div className="flex flex-wrap gap-1 max-w-[220px]">
+                          {skills.slice(0, 3).map((skill, idx) => (
+                            <span
+                              key={idx}
+                              className="px-1.5 py-0.5 rounded text-[10px] bg-white/5 border border-white/10 text-slate-300 font-medium"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                          {skills.length > 3 && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] text-slate-500 font-mono">
+                              +{skills.length - 3}
+                            </span>
+                          )}
+                        </div>
+
+                        {job.mainRisk && (
+                          <div className="flex items-center gap-1 text-[10px] text-amber-300/90 truncate max-w-[200px]" title={job.mainRisk}>
+                            <AlertTriangle className="w-2.5 h-2.5 flex-shrink-0 text-amber-400" />
+                            <span className="truncate">{job.mainRisk}</span>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* 6. Source & Ingest */}
+                      <td className="px-4 py-3.5 space-y-1">
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#1C1C24] border border-white/10 text-slate-300">
+                          {job.sourcePlatform || 'Direct Ingest'}
+                        </div>
+
+                        <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5" />
+                          <span>{job.firstSeenAt ? formatShortDate(job.firstSeenAt) : formatShortDate(job.createdAt)}</span>
+                        </div>
+                      </td>
+
+                      {/* 7. Status & Actions */}
+                      <td className="px-4 py-3.5 text-right space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1.5">
                           <select
                             value={job.status}
-                            onChange={(e) =>
-                              onUpdateJobStatus(job.id, e.target.value as JobStatus)
-                            }
-                            className={`appearance-none text-xs font-semibold py-1 pl-2.5 pr-6 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
+                            onChange={(e) => onUpdateJobStatus(job.id, e.target.value as JobStatus)}
+                            className={`text-xs font-semibold rounded-lg px-2 py-1 border cursor-pointer ${statusConf.bg} ${statusConf.color} ${statusConf.border}`}
                           >
                             {ALL_STATUSES.map((st) => (
-                              <option
-                                key={st}
-                                value={st}
-                                className="bg-[#16161A] text-slate-200 py-1"
-                              >
+                              <option key={st} value={st} className="bg-[#181820] text-slate-200">
                                 {st}
                               </option>
                             ))}
                           </select>
-                          <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
-                        </div>
-                      </td>
 
-                      {/* Date Applied */}
-                      <td className="py-3 px-3 text-slate-400 whitespace-nowrap">
-                        {job.dateApplied ? formatDate(job.dateApplied) : '-'}
-                      </td>
-
-                      {/* Deadline */}
-                      <td className="py-3 px-3 text-slate-400 whitespace-nowrap">
-                        {job.deadline ? (
-                          <span className="font-medium text-slate-300">{formatDate(job.deadline)}</span>
-                        ) : (
-                          '-'
-                        )}
-                      </td>
-
-                      {/* Type of Job */}
-                      <td className="py-3 px-3 whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-white/5 text-slate-300 border border-white/5">
-                          {job.jobType}
-                        </span>
-                      </td>
-
-                      {/* Salary (Annual) */}
-                      <td className="py-3 px-3 font-semibold text-white whitespace-nowrap">
-                        {job.salary && job.salary !== 'N/A' ? (
-                          <span className="text-emerald-400">
-                            {job.salary}
-                          </span>
-                        ) : (
-                          <span className="text-slate-500 font-normal">N/A</span>
-                        )}
-                      </td>
-
-                      {/* Location */}
-                      <td className="py-3 px-3 text-slate-400 whitespace-nowrap">
-                        <div className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-slate-500 flex-shrink-0" />
-                          <span>{job.location}</span>
-                        </div>
-                      </td>
-
-                      {/* Contact Email/LinkedIn */}
-                      <td className="py-3 px-3 text-slate-400" onClick={(e) => e.stopPropagation()}>
-                        {job.contactEmailOrLinkedIn ? (
-                          <div className="flex items-center gap-1.5 max-w-[180px]">
-                            {job.contactEmailOrLinkedIn.startsWith('http') ? (
-                              <a
-                                href={job.contactEmailOrLinkedIn}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-indigo-400 hover:underline truncate inline-flex items-center gap-1 text-[11px]"
-                              >
-                                <User className="w-3 h-3 flex-shrink-0" />
-                                <span className="truncate">LinkedIn</span>
-                              </a>
-                            ) : (
-                              <a
-                                href={`mailto:${job.contactEmailOrLinkedIn}`}
-                                className="text-indigo-400 hover:underline truncate inline-flex items-center gap-1 text-[11px]"
-                              >
-                                <Mail className="w-3 h-3 flex-shrink-0" />
-                                <span className="truncate">{job.contactEmailOrLinkedIn}</span>
-                              </a>
-                            )}
-                            <button
-                              onClick={(e) =>
-                                copyToClipboard(
-                                  job.contactEmailOrLinkedIn!,
-                                  `contact-${job.id}`,
-                                  e
-                                )
-                              }
-                              title="Copy contact"
-                              className="p-1 text-slate-500 hover:text-slate-200 transition-colors"
-                            >
-                              {copiedId === `contact-${job.id}` ? (
-                                <Check className="w-3 h-3 text-emerald-400" />
-                              ) : (
-                                <Copy className="w-3 h-3" />
-                              )}
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-slate-600">-</span>
-                        )}
-                      </td>
-
-                      {/* Interview Date */}
-                      <td className="py-3 px-3 whitespace-nowrap">
-                        {job.interviewDate ? (
-                          <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 font-semibold text-[11px]">
-                            {formatDate(job.interviewDate)}
-                          </span>
-                        ) : (
-                          <span className="text-slate-600">-</span>
-                        )}
-                      </td>
-
-                      {/* Tag / Notes */}
-                      <td className="py-3 px-3 text-slate-400 max-w-[160px]">
-                        <div className="flex flex-col gap-0.5">
-                          {job.tag && (
-                            <span className="self-start px-1.5 py-0.2 text-[10px] font-semibold rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                              #{job.tag}
-                            </span>
-                          )}
-                          {job.notes && (
-                            <span className="text-[11px] text-slate-400 truncate" title={job.notes}>
-                              {job.notes}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Actions */}
-                      <td className="py-3 px-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => onOpenAIPrep(job)}
-                            title="AI Prep & Follow Up"
-                            className="p-1.5 text-indigo-400 hover:bg-indigo-500/10 rounded-md transition-colors"
+                            onClick={() => onSelectJob(job)}
+                            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors"
+                            title="Review Opportunity & Strategy"
                           >
-                            <Sparkles className="w-3.5 h-3.5" />
+                            <ChevronRight className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => onEditJob(job)}
-                            title="Edit Job"
-                            className="p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-md transition-colors"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
+
                           <button
                             onClick={() => {
-                              if (confirm(`Delete application for ${job.companyName}?`)) {
+                              if (confirm(`Delete ${job.companyName} - ${job.jobTitle}?`)) {
                                 onDeleteJob(job.id);
                               }
                             }}
-                            title="Delete"
-                            className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition-colors"
+                            className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/30 text-slate-400 hover:text-rose-300 transition-colors"
+                            title="Delete Opportunity"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -422,12 +400,6 @@ export const TableView: React.FC<TableViewProps> = ({
               )}
             </tbody>
           </table>
-        </div>
-
-        {/* Table footer with counts */}
-        <div className="p-3 bg-[#0D0D10] border-t border-white/5 flex items-center justify-between text-xs text-slate-500">
-          <span>Showing {jobs.length} applications</span>
-          <span className="text-slate-500">Click any row to open full details & AI prep</span>
         </div>
       </div>
     </div>

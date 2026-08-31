@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Activity } from 'lucide-react';
 import { Header } from './components/Header';
 import { StatsBar } from './components/StatsBar';
@@ -15,9 +15,6 @@ import { CalendarView } from './components/CalendarView';
 import { JobModal } from './components/JobModal';
 import { JobDetailDrawer } from './components/JobDetailDrawer';
 import { ImportExportModal } from './components/ImportExportModal';
-import { AccountManagerModal } from './components/AccountManagerModal';
-import { AuthModal } from './components/AuthModal';
-import { SystemAdminModal } from './components/SystemAdminModal';
 import { UpcomingInterviewBanner } from './components/NotificationCenter';
 import { ActivityFeed } from './components/ActivityFeed';
 import { WebhookApiModal } from './components/WebhookApiModal';
@@ -29,26 +26,19 @@ import {
   StatusHistoryEntry,
   ApplicationReminder,
   ApplicationContact,
-  UserAccount,
+  UserProfile,
   PrepChecklistItem,
   CoverLetterRecord,
 } from './types';
 import { INITIAL_JOBS } from './data/initialJobs';
-import {
-  INITIAL_ACCOUNTS,
-  SARAH_CHEN_JOBS,
-  JORDAN_REED_JOBS,
-} from './data/initialAccounts';
 import { exportToCSV } from './utils/csvHelper';
 
-const ACCOUNTS_STORAGE_KEY = 'beamjobs_tracker_user_accounts_v2';
-const ACTIVE_ACCOUNT_KEY = 'beamjobs_tracker_active_account_id_v2';
-const THEME_STORAGE_KEY = 'beamjobs_tracker_theme_pref';
-const USER_JOBS_PREFIX = 'beamjobs_tracker_apps_user_';
+const STORAGE_KEY = 'job_tracker_applications_v2';
+const THEME_STORAGE_KEY = 'job_tracker_theme_pref';
 
-function getInitialJobsForUser(userId: string): JobApplication[] {
+function loadInitialJobs(): JobApplication[] {
   try {
-    const saved = localStorage.getItem(`${USER_JOBS_PREFIX}${userId}`);
+    const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -56,24 +46,21 @@ function getInitialJobsForUser(userId: string): JobApplication[] {
       }
     }
   } catch (e) {
-    console.error(`Error reading storage for user ${userId}:`, e);
+    console.error('Error reading jobs from localStorage:', e);
   }
 
-  // Fallback defaults per seeded user profile
-  if (userId === 'acc-alex-morgan') {
-    // Check legacy storage key
-    try {
-      const legacy = localStorage.getItem('beamjobs_tracker_applications_v2');
-      if (legacy) {
-        const parsed = JSON.parse(legacy);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_JOBS;
-  }
-  if (userId === 'acc-sarah-chen') return SARAH_CHEN_JOBS;
-  if (userId === 'acc-jordan-reed') return JORDAN_REED_JOBS;
-  return [];
+  // Check legacy storage keys for smooth backward compatibility
+  try {
+    const legacy =
+      localStorage.getItem('beamjobs_tracker_apps_user_acc-alex-morgan') ||
+      localStorage.getItem('beamjobs_tracker_applications_v2');
+    if (legacy) {
+      const parsed = JSON.parse(legacy);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+
+  return INITIAL_JOBS;
 }
 
 export default function App() {
@@ -98,49 +85,60 @@ export default function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // User Accounts State
-  const [accounts, setAccounts] = useState<UserAccount[]>(() => {
+  // Single User Profile for AI Cover Letters and Personalized Context
+  const userProfile = useMemo<UserProfile>(() => ({
+    name: 'My Workspace',
+    email: 'codebit.id@gmail.com',
+    targetRole: 'Senior Full-Stack & WordPress Engineer',
+    targetLocation: 'Remote (Worldwide / Indonesia)',
+    resumeHighlights:
+      '• 8+ years developing web applications, WordPress systems, and high-scale APIs\n• Strong background in TypeScript, React, PHP, and REST/Webhook integrations\n• Experienced working asynchronously with distributed international remote teams',
+  }), []);
+
+  // Primary Job Applications State
+  const [jobs, setJobs] = useState<JobApplication[]>(loadInitialJobs);
+
+  // Persist jobs to LocalStorage
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
     } catch (e) {
-      console.error('Error reading accounts from localStorage:', e);
+      console.error('Failed to save jobs to localStorage:', e);
     }
-    return INITIAL_ACCOUNTS;
-  });
+  }, [jobs]);
 
-  // Current Active User Account ID
-  const [currentAccountId, setCurrentAccountId] = useState<string>(() => {
-    try {
-      const saved = localStorage.getItem(ACTIVE_ACCOUNT_KEY);
-      if (saved) {
-        return saved;
-      }
-    } catch (e) {
-      console.error('Error reading active account from localStorage:', e);
-    }
-    return INITIAL_ACCOUNTS[0].id;
-  });
-
-  // Superadmin Scope State ('all' or specific accountId)
-  const [adminScope, setAdminScope] = useState<string>('all');
-
-  // Load initial jobs for active user
-  const [jobs, setJobs] = useState<JobApplication[]>(() => {
-    const initialAccountId = (() => {
+  // Synchronize server-side ingested jobs from REST API / Webhook endpoint as source of truth
+  useEffect(() => {
+    const fetchWebhookJobs = async () => {
       try {
-        return localStorage.getItem(ACTIVE_ACCOUNT_KEY) || INITIAL_ACCOUNTS[0].id;
-      } catch {
-        return INITIAL_ACCOUNTS[0].id;
+        const res = await fetch('/api/jobs');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.jobs)) {
+            if (data.jobs.length > 0) {
+              setJobs((prevJobs) => {
+                // If local jobs were loaded from initial seed or storage, merge server jobs seamlessly
+                const serverMap = new Map(data.jobs.map((j: JobApplication) => [j.id, j]));
+                const merged = data.jobs.slice();
+                prevJobs.forEach((localJob) => {
+                  if (!serverMap.has(localJob.id)) {
+                    merged.push(localJob);
+                  }
+                });
+                return merged;
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error syncing webhook jobs from server:', err);
       }
-    })();
-    return getInitialJobsForUser(initialAccountId);
-  });
+    };
+
+    fetchWebhookJobs();
+    const interval = setInterval(fetchWebhookJobs, 8000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Active View Mode
   const [viewMode, setViewMode] = useState<ViewMode>('board');
@@ -168,217 +166,24 @@ export default function App() {
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [importExportTab, setImportExportTab] = useState<'import' | 'export'>('export');
 
-  const [isAccountManagerOpen, setIsAccountManagerOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isSystemAdminOpen, setIsSystemAdminOpen] = useState(false);
   const [isActivityFeedOpen, setIsActivityFeedOpen] = useState(false);
   const [showDashboardFeed, setShowDashboardFeed] = useState(false);
   const [isWebhookModalOpen, setIsWebhookModalOpen] = useState(false);
 
-  // Sync server-side ingested jobs from REST API / Webhook endpoint
-  useEffect(() => {
-    const fetchWebhookJobs = async () => {
-      try {
-        const res = await fetch('/api/jobs');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && Array.isArray(data.jobs) && data.jobs.length > 0) {
-            setJobs((prevJobs) => {
-              const existingIds = new Set(prevJobs.map((j) => j.id));
-              const existingKeys = new Set(prevJobs.map((j) => j.sourceUniqueKey).filter(Boolean));
-              const newJobsToAdd = data.jobs.filter(
-                (wj: JobApplication) => !existingIds.has(wj.id) && (!wj.sourceUniqueKey || !existingKeys.has(wj.sourceUniqueKey))
-              );
-              if (newJobsToAdd.length > 0) {
-                return [...newJobsToAdd, ...prevJobs];
-              }
-              return prevJobs;
-            });
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching webhook jobs from server:', err);
-      }
-    };
-
-    fetchWebhookJobs();
-    const interval = setInterval(fetchWebhookJobs, 12000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Active Account Object
-  const currentAccount = useMemo(() => {
-    return (
-      accounts.find((a) => a.id === currentAccountId) ||
-      accounts[0] ||
-      INITIAL_ACCOUNTS[0]
-    );
-  }, [accounts, currentAccountId]);
-
-  const isSuperadmin = currentAccount.role === 'superadmin';
-
-  // Persist accounts list
-  useEffect(() => {
-    try {
-      localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
-    } catch (e) {
-      console.error('Failed to save accounts to localStorage:', e);
-    }
-  }, [accounts]);
-
-  // Persist active account ID
-  useEffect(() => {
-    try {
-      localStorage.setItem(ACTIVE_ACCOUNT_KEY, currentAccountId);
-    } catch (e) {
-      console.error('Failed to save active account ID to localStorage:', e);
-    }
-  }, [currentAccountId]);
-
-  // Persist active user's jobs (if not in superadmin aggregate view)
-  useEffect(() => {
-    if (!isSuperadmin || adminScope === currentAccountId) {
-      try {
-        localStorage.setItem(
-          `${USER_JOBS_PREFIX}${currentAccountId}`,
-          JSON.stringify(jobs)
-        );
-      } catch (e) {
-        console.error('Failed to save user jobs to localStorage:', e);
-      }
-    }
-  }, [jobs, currentAccountId, isSuperadmin, adminScope]);
-
-  // Helper to gather all jobs across all registered candidates for Superadmin
-  const getAllSystemJobs = useCallback((): JobApplication[] => {
-    const allJobs: JobApplication[] = [];
-    accounts.forEach((acc) => {
-      let accJobs: JobApplication[] = [];
-      if (acc.id === currentAccountId && !isSuperadmin) {
-        accJobs = jobs;
-      } else {
-        accJobs = getInitialJobsForUser(acc.id);
-      }
-
-      accJobs.forEach((j) => {
-        allJobs.push({
-          ...j,
-          accountId: acc.id,
-          accountName: acc.name,
-        });
-      });
-    });
-    return allJobs;
-  }, [accounts, currentAccountId, isSuperadmin, jobs]);
-
-  // Compute displayed jobs respecting candidate data isolation & superadmin scope
-  const activeDisplayJobs = useMemo(() => {
-    if (isSuperadmin) {
-      if (adminScope === 'all') {
-        return getAllSystemJobs();
-      } else {
-        // Specific candidate selected by superadmin
-        const candidate = accounts.find((a) => a.id === adminScope);
-        const candidateJobs = getInitialJobsForUser(adminScope);
-        return candidateJobs.map((j) => ({
-          ...j,
-          accountId: adminScope,
-          accountName: candidate?.name || 'Candidate',
-        }));
-      }
-    }
-    // Regular candidate: Strict data isolation
-    return jobs.map((j) => ({
-      ...j,
-      accountId: currentAccountId,
-      accountName: currentAccount.name,
-    }));
-  }, [isSuperadmin, adminScope, getAllSystemJobs, accounts, jobs, currentAccountId, currentAccount]);
-
-  // Calculate job counts for all accounts
-  const jobCountByAccount = useMemo(() => {
-    const counts: { [id: string]: number } = {};
-    accounts.forEach((acc) => {
-      if (acc.id === currentAccountId && !isSuperadmin) {
-        counts[acc.id] = jobs.length;
-      } else {
-        const accJobs = getInitialJobsForUser(acc.id);
-        counts[acc.id] = accJobs.length;
-      }
-    });
-    return counts;
-  }, [accounts, currentAccountId, isSuperadmin, jobs]);
-
-  // Handle Switching User Account
-  const handleSelectAccount = (newAccountId: string) => {
-    if (newAccountId === currentAccountId) return;
-    
-    // Save current candidate's jobs first
-    if (!isSuperadmin) {
-      try {
-        localStorage.setItem(
-          `${USER_JOBS_PREFIX}${currentAccountId}`,
-          JSON.stringify(jobs)
-        );
-      } catch {}
-    }
-
-    setCurrentAccountId(newAccountId);
-    setAdminScope('all');
-    const newJobs = getInitialJobsForUser(newAccountId);
-    setJobs(newJobs);
-    setSelectedJob(null);
-    setIsDetailDrawerOpen(false);
-  };
-
-  // Handle Account Management CRUD
-  const handleCreateAccount = (
-    accountData: Omit<UserAccount, 'id' | 'createdAt'>
-  ) => {
-    const newId = `acc-${Date.now()}`;
-    const newAccount: UserAccount = {
-      ...accountData,
-      id: newId,
-      createdAt: new Date().toISOString(),
-    };
-    setAccounts((prev) => [...prev, newAccount]);
-    handleSelectAccount(newId);
-  };
-
-  const handleUpdateAccount = (updatedAccount: UserAccount) => {
-    setAccounts((prev) =>
-      prev.map((a) => (a.id === updatedAccount.id ? updatedAccount : a))
-    );
-  };
-
-  const handleDeleteAccount = (accountId: string) => {
-    if (accounts.length <= 1) return;
-    const remaining = accounts.filter((a) => a.id !== accountId);
-    setAccounts(remaining);
-
-    try {
-      localStorage.removeItem(`${USER_JOBS_PREFIX}${accountId}`);
-    } catch {}
-
-    if (currentAccountId === accountId) {
-      handleSelectAccount(remaining[0].id);
-    }
-  };
-
   // Extract all unique tags
   const availableTags = useMemo(() => {
     const tagsSet = new Set<string>();
-    activeDisplayJobs.forEach((j) => {
+    jobs.forEach((j) => {
       if (j.tag && j.tag.trim()) {
         tagsSet.add(j.tag.trim());
       }
     });
     return Array.from(tagsSet);
-  }, [activeDisplayJobs]);
+  }, [jobs]);
 
   // Filtered & Sorted jobs calculation
   const filteredJobs = useMemo(() => {
-    let result = [...activeDisplayJobs];
+    let result = [...jobs];
 
     // 1. Keyword Search Query
     if (filters.search.trim()) {
@@ -394,7 +199,6 @@ export default function App() {
           (j.salary && j.salary.toLowerCase().includes(query)) ||
           (j.sourcePlatform && j.sourcePlatform.toLowerCase().includes(query)) ||
           (j.jobLinkDomain && j.jobLinkDomain.toLowerCase().includes(query)) ||
-          (j.accountName && j.accountName.toLowerCase().includes(query)) ||
           (j.contacts &&
             j.contacts.some(
               (c) =>
@@ -463,21 +267,40 @@ export default function App() {
     });
 
     return result;
-  }, [activeDisplayJobs, filters]);
+  }, [jobs, filters]);
 
-  // Helper to persist changes to a target job whether in local or superadmin global mode
-  const updateJobInStorage = useCallback((updatedJob: JobApplication) => {
-    const targetAccountId = updatedJob.accountId || currentAccountId;
-    const currentList = getInitialJobsForUser(targetAccountId);
-    const updatedList = currentList.map((j) => (j.id === updatedJob.id ? updatedJob : j));
+  // Helper for background syncing mutations to server
+  const syncJobToServer = async (id: string, updates: Partial<JobApplication>) => {
     try {
-      localStorage.setItem(`${USER_JOBS_PREFIX}${targetAccountId}`, JSON.stringify(updatedList));
-    } catch {}
-
-    if (targetAccountId === currentAccountId) {
-      setJobs(updatedList);
+      await fetch(`/api/jobs/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+    } catch (err) {
+      console.warn('Failed to sync job update to server:', err);
     }
-  }, [currentAccountId]);
+  };
+
+  const deleteJobFromServer = async (id: string) => {
+    try {
+      await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('Failed to delete job from server:', err);
+    }
+  };
+
+  const bulkDeleteJobsFromServer = async (ids: string[]) => {
+    try {
+      await fetch('/api/jobs/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+    } catch (err) {
+      console.warn('Failed to bulk delete jobs from server:', err);
+    }
+  };
 
   // Action handlers
   const handleOpenNewJob = (defaultStatus?: JobStatus) => {
@@ -513,19 +336,15 @@ export default function App() {
         updatedAt: now,
       };
 
-      updateJobInStorage(updatedJob);
+      setJobs((prev) => prev.map((j) => (j.id === updatedJob.id ? updatedJob : j)));
       if (selectedJob?.id === updatedJob.id) {
         setSelectedJob(updatedJob);
       }
+      syncJobToServer(updatedJob.id, updatedJob);
     } else {
-      const targetAccountId = isSuperadmin && adminScope !== 'all' ? adminScope : currentAccountId;
-      const targetAcc = accounts.find((a) => a.id === targetAccountId) || currentAccount;
-
       const newJob: JobApplication = {
         ...jobData,
         id: `job-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        accountId: targetAccountId,
-        accountName: targetAcc.name,
         createdAt: now,
         updatedAt: now,
         statusHistory: [
@@ -539,25 +358,21 @@ export default function App() {
         ],
       };
 
-      const currentList = getInitialJobsForUser(targetAccountId);
-      const updatedList = [newJob, ...currentList];
-      try {
-        localStorage.setItem(`${USER_JOBS_PREFIX}${targetAccountId}`, JSON.stringify(updatedList));
-      } catch {}
-
-      if (targetAccountId === currentAccountId) {
-        setJobs(updatedList);
-      }
+      setJobs((prev) => [newJob, ...prev]);
+      // Persist to server database
+      fetch('/api/jobs/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newJob),
+      }).catch((err) => console.warn('Failed to create job on server:', err));
     }
     setIsJobModalOpen(false);
     setJobToEdit(null);
   };
 
   const handleUpdateStatus = (id: string, newStatus: JobStatus) => {
-    const targetJob = activeDisplayJobs.find((j) => j.id === id);
-    if (!targetJob) return;
-
-    if (targetJob.status === newStatus) return;
+    const targetJob = jobs.find((j) => j.id === id);
+    if (!targetJob || targetJob.status === newStatus) return;
 
     const now = new Date().toISOString();
     const historyEntry: StatusHistoryEntry = {
@@ -575,44 +390,39 @@ export default function App() {
       statusHistory: [...(targetJob.statusHistory || []), historyEntry],
     };
 
-    updateJobInStorage(updatedJob);
+    setJobs((prev) => prev.map((j) => (j.id === id ? updatedJob : j)));
     if (selectedJob?.id === id) {
       setSelectedJob(updatedJob);
     }
+    syncJobToServer(id, { status: newStatus, statusHistory: updatedJob.statusHistory });
   };
 
   const handleDeleteJob = (id: string) => {
-    const targetJob = activeDisplayJobs.find((j) => j.id === id);
-    const targetAccountId = targetJob?.accountId || currentAccountId;
-
-    const currentList = getInitialJobsForUser(targetAccountId);
-    const updatedList = currentList.filter((j) => j.id !== id);
-    try {
-      localStorage.setItem(`${USER_JOBS_PREFIX}${targetAccountId}`, JSON.stringify(updatedList));
-    } catch {}
-
-    if (targetAccountId === currentAccountId) {
-      setJobs(updatedList);
-    }
-
+    setJobs((prev) => prev.filter((j) => j.id !== id));
     if (selectedJob?.id === id) {
       setIsDetailDrawerOpen(false);
       setSelectedJob(null);
     }
+    deleteJobFromServer(id);
   };
 
   const handleDeleteMultiple = (ids: string[]) => {
-    ids.forEach((id) => {
-      handleDeleteJob(id);
-    });
+    const idSet = new Set(ids);
+    setJobs((prev) => prev.filter((j) => !idSet.has(j.id)));
+    if (selectedJob && idSet.has(selectedJob.id)) {
+      setIsDetailDrawerOpen(false);
+      setSelectedJob(null);
+    }
+    bulkDeleteJobsFromServer(ids);
   };
 
-  const handleAddTimelineEntry = (entry: Omit<StatusHistoryEntry, 'id'>) => {
+  const handleAddTimelineEntry = (_jobId: string, entry: StatusHistoryEntry) => {
     if (!selectedJob) return;
     const now = new Date().toISOString();
     const newEntry: StatusHistoryEntry = {
       ...entry,
-      id: `hist-${Date.now()}`,
+      id: entry.id || `hist-${Date.now()}`,
+      date: entry.date || now,
     };
 
     const updatedJob: JobApplication = {
@@ -621,17 +431,18 @@ export default function App() {
       statusHistory: [...(selectedJob.statusHistory || []), newEntry],
     };
 
-    updateJobInStorage(updatedJob);
+    setJobs((prev) => prev.map((j) => (j.id === selectedJob.id ? updatedJob : j)));
     setSelectedJob(updatedJob);
+    syncJobToServer(selectedJob.id, { statusHistory: updatedJob.statusHistory });
   };
 
-  const handleAddReminder = (reminder: Omit<ApplicationReminder, 'id' | 'isCompleted' | 'createdAt'>) => {
+  const handleAddReminder = (_jobId: string, reminder: Omit<ApplicationReminder, 'id' | 'jobId' | 'createdAt'>) => {
     if (!selectedJob) return;
     const now = new Date().toISOString();
     const newReminder: ApplicationReminder = {
       ...reminder,
       id: `rem-${Date.now()}`,
-      isCompleted: false,
+      jobId: selectedJob.id,
       createdAt: now,
     };
 
@@ -641,176 +452,167 @@ export default function App() {
       reminders: [...(selectedJob.reminders || []), newReminder],
     };
 
-    updateJobInStorage(updatedJob);
+    setJobs((prev) => prev.map((j) => (j.id === selectedJob.id ? updatedJob : j)));
     setSelectedJob(updatedJob);
+    syncJobToServer(selectedJob.id, { reminders: updatedJob.reminders });
   };
 
   const handleToggleReminder = (jobId: string, reminderId: string) => {
-    const targetJob = activeDisplayJobs.find((j) => j.id === jobId);
-    if (!targetJob) return;
-
-    const updatedJob: JobApplication = {
-      ...targetJob,
-      updatedAt: new Date().toISOString(),
-      reminders: (targetJob.reminders || []).map((r) =>
-        r.id === reminderId ? { ...r, isCompleted: !r.isCompleted } : r
-      ),
-    };
-
-    updateJobInStorage(updatedJob);
-    if (selectedJob?.id === jobId) {
-      setSelectedJob(updatedJob);
-    }
+    setJobs((prev) =>
+      prev.map((j) => {
+        if (j.id !== jobId) return j;
+        const updatedReminders = (j.reminders || []).map((r) =>
+          r.id === reminderId ? { ...r, isCompleted: !r.isCompleted } : r
+        );
+        const updated = {
+          ...j,
+          updatedAt: new Date().toISOString(),
+          reminders: updatedReminders,
+        };
+        if (selectedJob?.id === jobId) setSelectedJob(updated);
+        syncJobToServer(jobId, { reminders: updatedReminders });
+        return updated;
+      })
+    );
   };
 
   const handleDeleteReminder = (jobId: string, reminderId: string) => {
-    const targetJob = activeDisplayJobs.find((j) => j.id === jobId);
-    if (!targetJob) return;
-
-    const updatedJob: JobApplication = {
-      ...targetJob,
-      updatedAt: new Date().toISOString(),
-      reminders: (targetJob.reminders || []).filter((r) => r.id !== reminderId),
-    };
-
-    updateJobInStorage(updatedJob);
-    if (selectedJob?.id === jobId) {
-      setSelectedJob(updatedJob);
-    }
+    setJobs((prev) =>
+      prev.map((j) => {
+        if (j.id !== jobId) return j;
+        const updatedReminders = (j.reminders || []).filter((r) => r.id !== reminderId);
+        const updated = {
+          ...j,
+          updatedAt: new Date().toISOString(),
+          reminders: updatedReminders,
+        };
+        if (selectedJob?.id === jobId) setSelectedJob(updated);
+        syncJobToServer(jobId, { reminders: updatedReminders });
+        return updated;
+      })
+    );
   };
 
-  const handleAddContact = (contact: Omit<ApplicationContact, 'id'>) => {
+  const handleAddContact = (_jobId: string, contact: Omit<ApplicationContact, 'id' | 'createdAt'>) => {
     if (!selectedJob) return;
     const newContact: ApplicationContact = {
       ...contact,
       id: `cont-${Date.now()}`,
+      createdAt: new Date().toISOString(),
     };
 
+    const updatedContacts = [...(selectedJob.contacts || []), newContact];
     const updatedJob: JobApplication = {
       ...selectedJob,
       updatedAt: new Date().toISOString(),
-      contacts: [...(selectedJob.contacts || []), newContact],
+      contacts: updatedContacts,
     };
 
-    updateJobInStorage(updatedJob);
+    setJobs((prev) => prev.map((j) => (j.id === selectedJob.id ? updatedJob : j)));
     setSelectedJob(updatedJob);
+    syncJobToServer(selectedJob.id, { contacts: updatedContacts });
   };
 
-  const handleUpdateContact = (contact: ApplicationContact) => {
+  const handleUpdateContact = (_jobId: string, contact: ApplicationContact) => {
     if (!selectedJob) return;
+    const updatedContacts = (selectedJob.contacts || []).map((c) =>
+      c.id === contact.id ? contact : c
+    );
     const updatedJob: JobApplication = {
       ...selectedJob,
       updatedAt: new Date().toISOString(),
-      contacts: (selectedJob.contacts || []).map((c) =>
-        c.id === contact.id ? contact : c
-      ),
+      contacts: updatedContacts,
     };
 
-    updateJobInStorage(updatedJob);
+    setJobs((prev) => prev.map((j) => (j.id === selectedJob.id ? updatedJob : j)));
     setSelectedJob(updatedJob);
+    syncJobToServer(selectedJob.id, { contacts: updatedContacts });
   };
 
-  const handleDeleteContact = (contactId: string) => {
+  const handleDeleteContact = (_jobId: string, contactId: string) => {
     if (!selectedJob) return;
+    const updatedContacts = (selectedJob.contacts || []).filter((c) => c.id !== contactId);
     const updatedJob: JobApplication = {
       ...selectedJob,
       updatedAt: new Date().toISOString(),
-      contacts: (selectedJob.contacts || []).filter((c) => c.id !== contactId),
+      contacts: updatedContacts,
     };
 
-    updateJobInStorage(updatedJob);
+    setJobs((prev) => prev.map((j) => (j.id === selectedJob.id ? updatedJob : j)));
     setSelectedJob(updatedJob);
+    syncJobToServer(selectedJob.id, { contacts: updatedContacts });
   };
 
   const handleUpdateChecklist = (jobId: string, checklist: PrepChecklistItem[]) => {
-    const targetJob = activeDisplayJobs.find((j) => j.id === jobId);
-    if (!targetJob) return;
-
-    const updatedJob: JobApplication = {
-      ...targetJob,
-      updatedAt: new Date().toISOString(),
-      interviewChecklist: checklist,
-    };
-
-    updateJobInStorage(updatedJob);
-    if (selectedJob?.id === jobId) {
-      setSelectedJob(updatedJob);
-    }
+    setJobs((prev) =>
+      prev.map((j) => {
+        if (j.id !== jobId) return j;
+        const updated = {
+          ...j,
+          updatedAt: new Date().toISOString(),
+          interviewChecklist: checklist,
+        };
+        if (selectedJob?.id === jobId) setSelectedJob(updated);
+        syncJobToServer(jobId, { interviewChecklist: checklist });
+        return updated;
+      })
+    );
   };
 
   const handleSaveCoverLetter = (jobId: string, coverLetter: CoverLetterRecord) => {
-    const targetJob = activeDisplayJobs.find((j) => j.id === jobId);
-    if (!targetJob) return;
-
-    const updatedJob: JobApplication = {
-      ...targetJob,
-      updatedAt: new Date().toISOString(),
-      savedCoverLetters: [...(targetJob.savedCoverLetters || []), coverLetter],
-    };
-
-    updateJobInStorage(updatedJob);
-    if (selectedJob?.id === jobId) {
-      setSelectedJob(updatedJob);
-    }
+    setJobs((prev) =>
+      prev.map((j) => {
+        if (j.id !== jobId) return j;
+        const updatedLetters = [...(j.savedCoverLetters || []), coverLetter];
+        const updated = {
+          ...j,
+          updatedAt: new Date().toISOString(),
+          savedCoverLetters: updatedLetters,
+        };
+        if (selectedJob?.id === jobId) setSelectedJob(updated);
+        syncJobToServer(jobId, { savedCoverLetters: updatedLetters });
+        return updated;
+      })
+    );
   };
 
   const handleAppendToJobNotes = (jobId: string, textToAppend: string) => {
-    const targetJob = activeDisplayJobs.find((j) => j.id === jobId);
-    if (!targetJob) return;
-
-    const currentNotes = targetJob.notes || '';
-    const newNotes = currentNotes ? `${currentNotes}\n\n${textToAppend}` : textToAppend;
-
-    const updatedJob: JobApplication = {
-      ...targetJob,
-      notes: newNotes,
-      updatedAt: new Date().toISOString(),
-    };
-
-    updateJobInStorage(updatedJob);
-    if (selectedJob?.id === jobId) {
-      setSelectedJob(updatedJob);
-    }
+    setJobs((prev) =>
+      prev.map((j) => {
+        if (j.id !== jobId) return j;
+        const currentNotes = j.notes || '';
+        const newNotes = currentNotes ? `${currentNotes}\n\n${textToAppend}` : textToAppend;
+        const updated = {
+          ...j,
+          notes: newNotes,
+          updatedAt: new Date().toISOString(),
+        };
+        if (selectedJob?.id === jobId) setSelectedJob(updated);
+        syncJobToServer(jobId, { notes: newNotes });
+        return updated;
+      })
+    );
   };
 
+
   const handleResetData = () => {
-    localStorage.removeItem(`${USER_JOBS_PREFIX}${currentAccountId}`);
-    const defaultData = getInitialJobsForUser(currentAccountId);
-    setJobs(defaultData);
+    localStorage.removeItem(STORAGE_KEY);
+    setJobs(INITIAL_JOBS);
     setSelectedJob(null);
     setIsDetailDrawerOpen(false);
   };
 
   const handleImportJobs = (importedJobs: JobApplication[]) => {
-    const tagged = importedJobs.map((j) => ({
-      ...j,
-      accountId: currentAccountId,
-      accountName: currentAccount.name,
-    }));
-    const updated = [...tagged, ...jobs];
-    setJobs(updated);
-    try {
-      localStorage.setItem(`${USER_JOBS_PREFIX}${currentAccountId}`, JSON.stringify(updated));
-    } catch {}
+    setJobs((prev) => [...importedJobs, ...prev]);
   };
 
   const handleExportSelected = (selectedJobs: JobApplication[]) => {
-    exportToCSV(selectedJobs, `${currentAccount.name.toLowerCase().replace(/\s+/g, '-')}-selected-jobs.csv`);
+    exportToCSV(selectedJobs, `job-tracker-export-${new Date().toISOString().split('T')[0]}.csv`);
   };
 
   const handleOpenImportExport = (tab: 'import' | 'export') => {
     setImportExportTab(tab);
     setIsImportExportOpen(true);
-  };
-
-  const handleAuthLogin = (accountId: string) => {
-    handleSelectAccount(accountId);
-  };
-
-  const handleAuthRegister = (
-    accountData: Omit<UserAccount, 'id' | 'createdAt'>
-  ) => {
-    handleCreateAccount(accountData);
   };
 
   return (
@@ -822,29 +624,21 @@ export default function App() {
         onOpenNewJob={() => handleOpenNewJob()}
         onOpenImportExport={handleOpenImportExport}
         onResetData={handleResetData}
-        totalJobsCount={activeDisplayJobs.length}
-        jobs={activeDisplayJobs}
+        totalJobsCount={jobs.length}
+        jobs={jobs}
         onSelectJob={handleSelectJob}
-        currentAccount={currentAccount}
-        accounts={accounts}
-        onSelectAccount={handleSelectAccount}
-        onOpenAccountManager={() => setIsAccountManagerOpen(true)}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
         theme={theme}
         onToggleTheme={handleToggleTheme}
-        adminScope={adminScope}
-        onAdminScopeChange={setAdminScope}
-        onOpenSystemAdmin={() => setIsSystemAdminOpen(true)}
         onOpenActivityFeed={() => setIsActivityFeedOpen(true)}
         onOpenWebhookApi={() => setIsWebhookModalOpen(true)}
       />
 
       {/* Upcoming Interview Alert Banner (<24h) */}
-      <UpcomingInterviewBanner jobs={activeDisplayJobs} onSelectJob={handleSelectJob} />
+      <UpcomingInterviewBanner jobs={jobs} onSelectJob={handleSelectJob} />
 
       {/* Main KPI Stats Bar */}
       <StatsBar
-        jobs={activeDisplayJobs}
+        jobs={jobs}
         onSelectStatusFilter={(status) => {
           if (status === 'all') {
             setFilters({ ...filters, statuses: [] });
@@ -860,7 +654,7 @@ export default function App() {
         onFilterChange={setFilters}
         availableTags={availableTags}
         totalResultsCount={filteredJobs.length}
-        totalJobsCount={activeDisplayJobs.length}
+        totalJobsCount={jobs.length}
       />
 
       {/* Activity Feed Dashboard Bar & Collapsible Widget */}
@@ -883,7 +677,7 @@ export default function App() {
         </button>
 
         <span className="text-[11px] text-slate-400 hidden md:inline">
-          Live stream of status changes, reminders, and contacts across all jobs
+          Live stream of status changes, webhook arrivals, reminders, and contacts
         </span>
       </div>
 
@@ -891,7 +685,7 @@ export default function App() {
       {showDashboardFeed && (
         <div className="max-w-7xl mx-auto px-4 sm:px-8 mb-6 animate-in fade-in slide-in-from-top-2 duration-200">
           <ActivityFeed
-            jobs={activeDisplayJobs}
+            jobs={jobs}
             onSelectJob={handleSelectJob}
             isEmbedded={true}
             onClose={() => setShowDashboardFeed(false)}
@@ -925,11 +719,11 @@ export default function App() {
           />
         )}
 
-        {viewMode === 'analytics' && <AnalyticsView jobs={activeDisplayJobs} />}
+        {viewMode === 'analytics' && <AnalyticsView jobs={jobs} />}
 
         {viewMode === 'calendar' && (
           <CalendarView
-            jobs={activeDisplayJobs}
+            jobs={jobs}
             onSelectJob={handleSelectJob}
             onOpenAIPrep={handleOpenAIPrep}
             onToggleReminder={handleToggleReminder}
@@ -946,7 +740,7 @@ export default function App() {
         defaultStatus={modalDefaultStatus}
       />
 
-      {/* Job Details Drawer with Domain Badge, Contacts, Gemini AI Assistant, Timeline, and Reminders */}
+      {/* Job Details Drawer */}
       <JobDetailDrawer
         job={selectedJob}
         isOpen={isDetailDrawerOpen}
@@ -964,47 +758,10 @@ export default function App() {
         onAddContact={handleAddContact}
         onUpdateContact={handleUpdateContact}
         onDeleteContact={handleDeleteContact}
-        currentAccount={currentAccount}
+        currentAccount={userProfile}
         onUpdateChecklist={handleUpdateChecklist}
         onSaveCoverLetter={handleSaveCoverLetter}
         onAppendToJobNotes={handleAppendToJobNotes}
-      />
-
-      {/* Multiple User Account Manager Modal */}
-      <AccountManagerModal
-        isOpen={isAccountManagerOpen}
-        onClose={() => setIsAccountManagerOpen(false)}
-        accounts={accounts}
-        currentAccountId={currentAccountId}
-        onSelectAccount={handleSelectAccount}
-        onCreateAccount={handleCreateAccount}
-        onUpdateAccount={handleUpdateAccount}
-        onDeleteAccount={handleDeleteAccount}
-        jobCountByAccount={jobCountByAccount}
-      />
-
-      {/* Superadmin System Management Console Modal */}
-      <SystemAdminModal
-        isOpen={isSystemAdminOpen}
-        onClose={() => setIsSystemAdminOpen(false)}
-        accounts={accounts}
-        currentAccountId={currentAccountId}
-        onSelectAccount={handleSelectAccount}
-        onCreateAccount={handleCreateAccount}
-        onUpdateAccount={handleUpdateAccount}
-        onDeleteAccount={handleDeleteAccount}
-        jobCountByAccount={jobCountByAccount}
-        allSystemJobsCount={getAllSystemJobs().length}
-      />
-
-      {/* Candidate Authentication & Login Modal */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        accounts={accounts}
-        currentAccountId={currentAccountId}
-        onLogin={handleAuthLogin}
-        onRegister={handleAuthRegister}
       />
 
       {/* CSV Import & Export Modal */}
@@ -1012,13 +769,13 @@ export default function App() {
         isOpen={isImportExportOpen}
         initialTab={importExportTab}
         onClose={() => setIsImportExportOpen(false)}
-        jobs={activeDisplayJobs}
+        jobs={jobs}
         onImportJobs={handleImportJobs}
       />
 
       {/* Activity Feed Modal / Drawer */}
       <ActivityFeed
-        jobs={activeDisplayJobs}
+        jobs={jobs}
         onSelectJob={handleSelectJob}
         isOpen={isActivityFeedOpen}
         onClose={() => setIsActivityFeedOpen(false)}
@@ -1030,7 +787,11 @@ export default function App() {
         onClose={() => setIsWebhookModalOpen(false)}
         onJobImported={(newJob) => {
           setJobs((prev) => {
-            const exists = prev.some((j) => j.id === newJob.id || (j.sourceUniqueKey && j.sourceUniqueKey === newJob.sourceUniqueKey));
+            const exists = prev.some(
+              (j) =>
+                j.id === newJob.id ||
+                (j.sourceUniqueKey && j.sourceUniqueKey === newJob.sourceUniqueKey)
+            );
             if (exists) return prev;
             return [newJob, ...prev];
           });

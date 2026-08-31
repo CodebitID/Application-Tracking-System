@@ -566,32 +566,33 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({
             </div>
           </div>
 
-          {/* AUTOMATED QUALIFICATION & FIT ASSESSMENT (Ingested via REST Webhook) */}
-          {(job.fitScore !== undefined || job.eligibility || job.matchedSkills?.length || job.mainRisk) && (
-            <div className="p-5 rounded-2xl bg-[#16161A] border border-white/5 space-y-4">
+          {/* COMPREHENSIVE OPPORTUNITY ANALYSIS (DATA MODEL V2) */}
+          {(job.overallFitScore !== undefined || job.fitScore !== undefined || job.recommendation || job.criticalRequirements?.length || job.strongMatches?.length || job.mainRisk || job.analysisSummary) && (
+            <div className="p-5 rounded-2xl bg-[#16161A] border border-white/10 space-y-5 shadow-lg">
+              {/* Header & Classification */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                      Automated Fit Assessment & Qualification
+                      Opportunity & Fit Analysis
                     </h3>
                     <p className="text-xs text-slate-400">
-                      Discovery intelligence, remote Indonesia clearance, and skill alignment
+                      Automated assessment, match evaluation, and strategic positioning
                     </p>
                   </div>
                 </div>
 
                 {job.recommendation && (
                   <span
-                    className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
-                      job.recommendation === 'HIGH PRIORITY'
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                        : job.recommendation === 'APPLY'
-                        ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
-                        : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                    className={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${
+                      job.recommendation.includes('HIGH')
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                        : job.recommendation.includes('APPLY') && !job.recommendation.includes('SELECT')
+                        ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                        : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                     }`}
                   >
                     {job.recommendation}
@@ -599,97 +600,201 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({
                 )}
               </div>
 
-              {/* Fit Breakdown Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1">
+              {/* 6-Dimension Fit Score Breakdown */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                <div className="p-3 rounded-xl bg-black/50 border border-white/5 space-y-1">
                   <span className="text-[10px] text-slate-400 uppercase font-semibold">Overall Fit</span>
-                  <div className="text-base font-bold text-emerald-400">
-                    {job.fitScore !== undefined ? `${job.fitScore}%` : 'N/A'}
+                  <div className="text-lg font-bold text-emerald-400">
+                    {(job.overallFitScore ?? job.fitScore) !== undefined ? `${job.overallFitScore ?? job.fitScore}%` : 'N/A'}
                   </div>
                 </div>
 
-                <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1">
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold">Technical Fit</span>
-                  <div className="text-base font-bold text-indigo-400">
+                <div className="p-3 rounded-xl bg-black/50 border border-white/5 space-y-1">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold">Technical</span>
+                  <div className="text-lg font-bold text-indigo-400">
                     {job.technicalFit !== undefined ? `${job.technicalFit}%` : 'N/A'}
                   </div>
                 </div>
 
-                <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                <div className="p-3 rounded-xl bg-black/50 border border-white/5 space-y-1">
                   <span className="text-[10px] text-slate-400 uppercase font-semibold">Experience</span>
-                  <div className="text-base font-bold text-purple-400">
+                  <div className="text-lg font-bold text-purple-400">
                     {job.experienceFit !== undefined ? `${job.experienceFit}%` : 'N/A'}
                   </div>
                 </div>
 
-                <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1">
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold">Location Fit</span>
-                  <div className="text-base font-bold text-cyan-400">
-                    {job.locationFit !== undefined ? `${job.locationFit}%` : '100%'}
+                <div className="p-3 rounded-xl bg-black/50 border border-white/5 space-y-1">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold">Location / Eligibility</span>
+                  <div className="text-lg font-bold text-cyan-400">
+                    {(job.locationEligibilityFit ?? job.locationFit) !== undefined ? `${job.locationEligibilityFit ?? job.locationFit}%` : '100%'}
                   </div>
                 </div>
-              </div>
 
-              {/* Eligibility & Risk Details */}
-              <div className="space-y-2 text-xs">
-                {job.eligibility && (
-                  <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-slate-300 flex items-start gap-2.5">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-semibold text-emerald-300">Eligibility Clearance: </span>
-                      <span>{job.eligibility}</span>
-                    </div>
+                {job.seniorityFit !== undefined && (
+                  <div className="p-3 rounded-xl bg-black/50 border border-white/5 space-y-1">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Seniority Fit</span>
+                    <div className="text-lg font-bold text-amber-400">{job.seniorityFit}%</div>
                   </div>
                 )}
 
-                {job.mainRisk && (
-                  <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-slate-300 flex items-start gap-2.5">
-                    <ShieldAlert className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-semibold text-amber-300">Key Risk / Overlap Requirement: </span>
-                      <span>{job.mainRisk}</span>
-                    </div>
+                {job.compensationFit !== undefined && (
+                  <div className="p-3 rounded-xl bg-black/50 border border-white/5 space-y-1">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Compensation Fit</span>
+                    <div className="text-lg font-bold text-emerald-400">{job.compensationFit}%</div>
                   </div>
                 )}
               </div>
 
-              {/* Matched vs Missing Skills */}
-              {((job.matchedSkills && job.matchedSkills.length > 0) || (job.missingSkills && job.missingSkills.length > 0)) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
-                  {job.matchedSkills && job.matchedSkills.length > 0 && (
-                    <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-2">
-                      <div className="font-semibold text-emerald-400 flex items-center gap-1.5 text-[11px]">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Matched Core Skills ({job.matchedSkills.length})
+              {/* Strategic Positioning & Analysis Summary */}
+              {(job.bestPositioning || job.analysisSummary) && (
+                <div className="p-4 rounded-xl bg-indigo-950/20 border border-indigo-500/20 space-y-2 text-xs">
+                  {job.bestPositioning && (
+                    <div>
+                      <span className="font-semibold text-indigo-300">Best Positioning: </span>
+                      <span className="text-slate-300">{job.bestPositioning}</span>
+                    </div>
+                  )}
+                  {job.analysisSummary && (
+                    <div className="text-slate-300 border-t border-indigo-500/10 pt-2 leading-relaxed">
+                      {job.analysisSummary}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* What They Actually Need (Requirements & Responsibilities) */}
+              {((job.criticalRequirements && job.criticalRequirements.length > 0) ||
+                (job.preferredRequirements && job.preferredRequirements.length > 0) ||
+                (job.roleResponsibilities && job.roleResponsibilities.length > 0)) && (
+                <div className="space-y-3 pt-1">
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">What They Actually Need</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    {job.criticalRequirements && job.criticalRequirements.length > 0 && (
+                      <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-2">
+                        <span className="font-semibold text-rose-300 flex items-center gap-1.5 text-[11px]">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          Critical Requirements ({job.criticalRequirements.length})
+                        </span>
+                        <ul className="space-y-1 text-slate-300 text-[11px]">
+                          {job.criticalRequirements.map((req, idx) => (
+                            <li key={idx} className="flex items-start gap-1.5">
+                              <span className="text-rose-400 mt-0.5">•</span>
+                              <span>{req}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {job.matchedSkills.map((sk) => (
-                          <span
-                            key={sk}
-                            className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[10px] font-medium"
-                          >
-                            {sk}
-                          </span>
-                        ))}
+                    )}
+
+                    {job.preferredRequirements && job.preferredRequirements.length > 0 && (
+                      <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-2">
+                        <span className="font-semibold text-indigo-300 flex items-center gap-1.5 text-[11px]">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Preferred Requirements ({job.preferredRequirements.length})
+                        </span>
+                        <ul className="space-y-1 text-slate-300 text-[11px]">
+                          {job.preferredRequirements.map((req, idx) => (
+                            <li key={idx} className="flex items-start gap-1.5">
+                              <span className="text-indigo-400 mt-0.5">•</span>
+                              <span>{req}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* My Match & Assessment (Strong Matches, Partial Matches, Gaps) */}
+              {((job.strongMatches && job.strongMatches.length > 0) ||
+                (job.partialMatches && job.partialMatches.length > 0) ||
+                (job.gaps && job.gaps.length > 0) ||
+                (job.matchedSkills && job.matchedSkills.length > 0) ||
+                (job.missingSkills && job.missingSkills.length > 0)) && (
+                <div className="space-y-3 pt-1">
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Candidate Match Evaluation</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    {(job.strongMatches || job.matchedSkills) && (
+                      <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-2">
+                        <div className="font-semibold text-emerald-400 flex items-center gap-1.5 text-[11px]">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Strong Matches ({(job.strongMatches || job.matchedSkills)!.length})
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(job.strongMatches || job.matchedSkills)!.map((sk, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[10px] font-medium"
+                            >
+                              {sk}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(job.gaps || job.missingSkills) && (
+                      <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-2">
+                        <div className="font-semibold text-amber-400 flex items-center gap-1.5 text-[11px]">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          Gaps / Missing Areas ({(job.gaps || job.missingSkills)!.length})
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(job.gaps || job.missingSkills)!.map((sk, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px] font-medium"
+                            >
+                              {sk}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Restrictions, Blockers & Main Risk */}
+              {(job.hardBlockers?.length || job.workAuthorization || job.countryRestrictions || job.timezoneRequirement || job.mainRisk || job.eligibility) && (
+                <div className="space-y-2 text-xs">
+                  {job.eligibility && (
+                    <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-slate-300 flex items-start gap-2.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold text-emerald-300">Eligibility Clearance: </span>
+                        <span>{job.eligibility}</span>
                       </div>
                     </div>
                   )}
 
-                  {job.missingSkills && job.missingSkills.length > 0 && (
-                    <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-2">
-                      <div className="font-semibold text-amber-400 flex items-center gap-1.5 text-[11px]">
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        Gaps / Growth Areas ({job.missingSkills.length})
+                  {job.mainRisk && (
+                    <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-slate-300 flex items-start gap-2.5">
+                      <ShieldAlert className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold text-amber-300">Key Risk / Overlap Note: </span>
+                        <span>{job.mainRisk}</span>
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {job.missingSkills.map((sk) => (
-                          <span
-                            key={sk}
-                            className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px] font-medium"
-                          >
-                            {sk}
-                          </span>
-                        ))}
+                    </div>
+                  )}
+
+                  {job.timezoneRequirement && (
+                    <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 text-slate-300 flex items-start gap-2.5">
+                      <Globe className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold text-blue-300">Timezone Requirement: </span>
+                        <span>{job.timezoneRequirement}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {job.workAuthorization && (
+                    <div className="p-3 rounded-xl bg-purple-500/5 border border-purple-500/20 text-slate-300 flex items-start gap-2.5">
+                      <ShieldCheck className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold text-purple-300">Work Authorization: </span>
+                        <span>{job.workAuthorization}</span>
                       </div>
                     </div>
                   )}
@@ -697,6 +802,7 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({
               )}
             </div>
           )}
+
 
           {/* INTERVIEW PREPARATION CHECKLIST FEATURE */}
           <InterviewChecklist
